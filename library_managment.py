@@ -1,230 +1,259 @@
-# #*****************( BOOK GALARY ) [ 3 JLUI 2024 ]
+# ( BOOKS LIBRARY ) --> Editing on [ 16 Nov 2025 ]
 
-import os 
-import random
+import os, time
 
 library = {}
 
-check_out_books = {}
+checkedout_books = {}
 
-def clear_screen():
+def sleep(duration):
+    time.sleep(duration)
+
+
+def clear_terminal():
     os.system('clear' if os.name == 'posix' else 'cls')
 
 def add_book():
-    global library
 
-    check_varible = False
+    check_varible = True
     
-    isbn_num = input('\nEnter ISBN:  ')
+    isbn = input('\nEnter ISBN:  ')
 
-    if not isbn_num.isdigit():
+    if not isbn.isdigit():
      
-     print(f'\nISBN ({isbn_num}) some field is not a digit:***') 
+     print(f'\nISBN ({isbn}) some field is not a digit:***') 
 
-    elif isbn_num in library:
+    elif isbn in library:
 
-        print(f"\nISBN ({isbn_num}) is already in library:**")
+        print(f"\nISBN ({isbn}) is already in library:**")
 
-    else:
+    elif isbn in checkedout_books:
+
+        print(f"\nISBN [ {isbn} ] is already exist in checkedout\n\n")
+
+    else: 
 
         title_of_book = input('\nEnter title of book:  ').title()
-  
-        for letter in title_of_book:
 
+        if len(title_of_book) < 2:
+
+            print(f"\nMaybe forgot entry?\n\n")
+            return
+
+        for letter in title_of_book:
+            
             if letter.isalpha() or letter == ' ':
                 continue
 
             else:
 
                 print(f"\nTitle input ({letter}) is not lapha letter: ")
-                check_varible = '0'
+
+                check_varible = False
                 break
 
-        if check_varible == '0': 
 
-            print('\nTry again')
-
-        elif not title_of_book:
-
-            print('\nMaby you forgot to enter data:***')
-
-        else:
+        if check_varible:
 
             author = input('\nEnter a name of author:  ').capitalize()
-         
+
+            if len(author) < 2:
+
+                print(f"\nMaybe forgot entry?\n\n")
+                return
+            
             for letter in author:
+
                 if letter.isalpha() or letter == ' ':
                     continue
+
                 else:
                     print(f'\nAuthor entry ({letter}) is not alpah letter:  ')
-                    check_varible = '0'
+
+                    check_varible = False
                     break
         
 
-            if check_varible == '0':
-                print('\nTry again:**')
+            if check_varible:
 
-            elif not author:
-                print(f'\nMaby you forgot to enter data:***')
-
-            else:
-                library[isbn_num] = {
+                library[isbn] = {
                     'author':[author],
                     'title':[title_of_book],
                 }
-                check_varible = True
+                
 
-    print('Added was successfully:***') if check_varible == True else print('Added was not successfully:***')
+        if check_varible:
+            print('\nAdded was successfully!\n\n')
+
+        else:
+            print('\nAdded was not successfully!\n\n')
 
 
+def check_out():
 
-while True:
-    print('''
-          1. ADD BOOK 
-          2. CHECK OUT BOOK 
-          3. CHECK IN BOOK 
-          4. SHOW AVAILABLE BOOKS
-          5. SHOW BORROW BOOKS
-          6. Dlete data
-          7. EXIT 
- ''')
-    choice_option = input('Enter your chioce:  ')
+    if not library:
 
-    if not choice_option.isdigit():
+        print('There are no books to borrow\n\n')
+        return
 
-        print(f'\nYour entry ({choice_option}) is not a digit:**')
+
+    isbn_num = input('Etner ISBN number:  ')
+
+
+    if not isbn_num.isdigit(): 
+
+        print(f'\nTry again, your entry ({isbn_num}) is not digit\n\n')
+        return
+
+    
+    if isbn_num not in library:
+
+        print(f"\nThis ISBN ({isbn_num}) is not definde or already checked out\n\n")
+        return
 
     else:
 
-        clear_screen()
-        int_choice = int(choice_option)
+        # HOW TO ADD ISBN IN OUT_CHECK_DIC WITH ALL OF DATA? (Done***)
+        if isbn_num not in checkedout_books:
 
-        if int_choice == 1:
+            checkedout_books[isbn_num] = library[isbn_num]
+
+
+            print('\n\nISBN: ',isbn_num,library[isbn_num],'\n\nCheckedout successful!\n\n') 
+
+            del library[isbn_num]
+
+
+def check_in():
+
+
+    if not checkedout_books:
+
+        print('\nNo books checked out of library\n\n')
+
+    else:
+
+        isbn_num = input('\nEnter ISBN number:  ')
+
+        if not isbn_num.isdigit():
+
+            print(f'\nYour input ({isbn_num}) is not digit!\n\n')
+            return
+
+        if isbn_num in library:
+
+            print(f"\nISBN [ {isbn_num} ] is exist in library!\n\n")
+            return
+            
+        if not isbn_num in checkedout_books:
+
+            print(f'\nISBN ({isbn_num}) did not check out or not definde\n\n')
+            return
+
+
+        if isbn_num not in library:
+
+            library[isbn_num] = checkedout_books[isbn_num]
+
+            print(f'\nISBN ({isbn_num}) checked in is successfully\n\n')
+                
+            del checkedout_books[isbn_num]
+
+
+def dispaly(dict):
+
+    for isbn in dict:
+        
+        for data in dict[isbn]:
+
+            print(f'ISBN: {isbn}: {dict[isbn]}\n')
+            print('_' * 20)
+            print("\n")
+            break
+
+def show_choices():
+
+    print('''
+        1. ADD BOOK 
+        2. CHECK OUT BOOK 
+        3. CHECK IN BOOK 
+        4. SHOW AVAILABLE BOOKS
+        5. SHOW BORROW BOOKS
+        6. Dlete data
+        7. EXIT 
+''')
+
+
+while True:
+
+    clear_terminal()
+
+    show_choices()
+    
+    choice_option = input('\nEnter your chioce:  ')
+
+    if not choice_option.isdigit():
+
+        print(f'\nEnter a digit from [ 1 to 7 ] please not [ {choice_option} ]\n\n')
+
+    else:
+
+        clear_terminal()
+
+        int_option = int(choice_option)
+
+        if int_option == 1: # Add book
+
             add_book()
 
-        elif int_choice == 2:
+        elif int_option == 2: # Check out
+
+            check_out()
+
+        elif int_option == 3: # Check in
+
+           check_in()
+
+        elif int_option == 4: # Display availabel books
 
             if not library:
-
-                print('There are no books to borrow:***')
-
-            else:
-
-                isbn_num = input('Etner ISBN number:  ')
-
-                if not isbn_num.isdigit(): 
-                    print(f'\nTry again, your entry ({isbn_num}) is not digit:')
-
-                else:
-
-                    if isbn_num not in library:
-
-                        print(f"This ISBN ({isbn_num}) is not definde or already checked out:***")
-
-                    else:
-
-                        # HOW TO ADD ISBN IN OUT_CHECK_DIC WITH ALL OF DATA? (Done***)
-                        print('ISBN.',isbn_num,library[isbn_num],': checked out of the library:***') 
-                        
-                        for data_in_isbn in library[isbn_num]:
-
-                            for info in library[isbn_num][data_in_isbn]:
-
-                                if isbn_num not in check_out_books:
-
-                                    check_out_books[isbn_num] = {data_in_isbn : [info],} 
-
-                                else:
-                                    check_out_books[isbn_num][data_in_isbn] = [info]
-
-                        if library[isbn_num] == check_out_books[isbn_num]:
-
-                            del library[isbn_num]
-
-                            print(f'Checked out ISBN ({isbn_num}) is successfully:***')
-
-                        else:
-                            print(f'Checked out ISBN ({isbn_num}) was not successfully:***')
-
-        elif int_choice == 3:
-
-            if not check_out_books:
-
-                print('\nNo books checked out of library:***')
-
-            else:
-                isbn_num = input('\nEnrer ISBN number:  ')
-
-                if not isbn_num.isdigit():
-
-                    print(f'\nYour input ({isbn_num}) is not digit:***')
-
-                else:
-
-                    if not isbn_num in check_out_books:
-                        print(f'\nISBN ({isbn_num}) did not check out or not definde:***')
-
-                    else:
-
-                        for data_in_isbn in check_out_books[isbn_num]:
-
-                            for info in check_out_books[isbn_num][data_in_isbn]:
-
-                                if isbn_num not in library:
-
-                                    library[isbn_num] = {data_in_isbn: [info],}
-
-                                else:
-                                    library[isbn_num][data_in_isbn] = [info]
-
-                        if check_out_books[isbn_num] == library[isbn_num]:
-
-                            del check_out_books[isbn_num]
-
-                            print(f'\nISBN ({isbn_num}) checked in is successfully:***')
-
-                        else:
-                            print(f'\nISBN ({isbn_num}) checked in was not successfully:***')
-                
-        elif int_choice == 4:
-
-            if not library:
-                print('\nlibrary is empty there is nothing to show:') 
+                print('\nLibrary is empty there is nothing to show!\n\n') 
 
             else:
                 print('\n***Available Books***\n')
-                for keys in library:
-                    print('ISBN.',keys,': ',library[keys])
-                    print('- - - - - - - -')
 
-        elif int_choice == 5:
+                dispaly(dict= library)
 
-            if not check_out_books:
-                print(f'Out check list is empty: ({check_out_books} ***)')
+        elif int_option == 5: # display borrow books
+
+            if not checkedout_books:
+
+                print(f'\nNothing checkedout! [ {checkedout_books} ]\n\n')
 
             else:
-                print('\n***Books out of library***\n')
-                for keys in check_out_books:
-                    print('ISBN: ',keys,check_out_books[keys])
-                    print('- - - - - - - - - ')
+                print('\n\n---Checkedout books---\n\n')
 
-        elif int_choice == 6:
+
+                dispaly(dict= checkedout_books)
+
+
+        elif int_option == 6:
+
             if not library:
-                print(f'Library is already empty: ({library}) ***')
+
+                print(f'\nLibrary is already empty: [ {library} ]\n\n')
 
             else:
                 library = {}
-                print(f'\nDeleted was successfully: library {library} ***')
+                print(f'\nDeletion was successfully: [ {library} ]\n\n')
 
-        elif int_choice == 7:
+        elif int_option == 7:
+            print("\nSee you later!\n\n")
             break
+
         else:
-            print(f'\nYour entry ({choice_option}) is more than a field:') if len(choice_option) >1 else print(f'\nYour entry ({choice_option}) is out of range')
 
-# (9 JULI FINISHED PRODUCT )***
-
-
-
-
-
+            print(f"Please enter a digit from [ 1 to 7 ] not [ {choice_option} ]\n\n")
+    
+    sleep(3)
 
