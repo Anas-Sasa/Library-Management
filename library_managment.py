@@ -1,228 +1,324 @@
 """
-library_cli.py
+library_management_v1.py
 
-Simple command-line Books Library manager.
+Command-line Books Library manager:
 
-Provides functions to add books, check them out, check them back in, and
-display library or checked-out collections. Data is stored in-memory using
-two dictionaries: `library` for available books and `checkedout_books` for
-borrowed books.
+This script provides a simple CSV-backed library system with two files:
+- library.csv for available books
+- checked-out.csv for borrowed books
 
-Note: This is a lightweight demo for local use; there is no persistent storage.
+Features:
+- create CSV files with headers if missing
+- add a book with input validation (ISBN, title, author)
+- check out a book (move row from library.csv to checked-out.csv)
+- check in a book (move row from checked-out.csv back to library.csv)
+- remove rows by ISBN, display CSV content using pandas
+- simple CLI menu for user interaction
+
+Intended audience: beginners learning Python, file I/O, pandas and basic CLI UX.
 """
 
-# [ BOOKS LIBRARY ] --> Editing on [ 16 Nov 2025 ]
-
-# Standard library imports
-# os: clear the terminal in a cross-platform way
-# time: pause execution briefly to improve CLI readability
-import os, time
-
-# In-memory storage for available and borrowed books
-library = {}
-checkedout_books = {}
+# [ BOOKS LIBRARY ] --> Editing on [ 23 Nov 2025 ]
 
 
-def sleep(duration):
-    """
-    Pause execution for the given number of seconds."""
+# Import pandas for CSV reading/writing convenience, os for filesystem ops, time for delays
+import pandas,os, time
 
-    time.sleep(duration)
+# Import csv.writer for appending rows to CSV files
+from csv import writer
+
+
+# Build an absolute path for the main library CSV file in the current working directory
+library = os.path.join(os.getcwd(), "library.csv") 
+
+# Build an absolute path for the checked-out CSV file in the current working directory
+checked_out_books = os.path.join(os.getcwd(), "checked-out.csv")
+
 
 def clear_terminal():
-    """
-    Clear the terminal screen depending on the operating system."""
 
-    os.system('clear' if os.name == 'posix' else 'cls')
+    # Clear the terminal screen depending on operating system: Windows uses 'cls', POSIX uses 'clear'
+    os.system("cls" if os.name == "nt" else "clear")
 
+
+def sleep(second):
+    # Pause execution for the given number of seconds (simple wrapper)
+    time.sleep(second)
+
+
+# Ensure a CSV file exists and contains the header row if it was missing or empty
+def generate_file(file_name):
+    # If the file does not exist or the file is empty, create it and write a header
+    if not os.path.exists(file_name) or os.path.getsize(file_name) == 0:
+
+        with open(file_name, "w", newline="") as f:
+
+            writer(f).writerow( ["isbn", "author", "book_title"] ) 
+
+# Check whether a given ISBN already exists in the given CSV file
+def is_isbn_exist(new_isbn,filename):
+
+    # Read the CSV file into a pandas Series of isbn values with all columns as strings
+    filename = pandas.read_csv(filename, dtype= str)["isbn"]
+
+    # Check each existing ISBN for equality with the new one
+    for exist_isbn in filename:
+
+        if new_isbn == exist_isbn: 
+
+            return True
+            
+    else:
+        # If loop completes with no match return False
+        return False
+
+# Append a new row to the library CSV with the provided isbn, author and title
+def store_data(new_isbn, author_name, book_title):
+
+
+    with open(library, "a", newline= "") as f:
+
+
+        writer(f).writerow( [new_isbn, author_name, book_title] )
+
+        print('\nAdded was successfully!\n\n')
+
+# Transfer a single book row by ISBN from one CSV file to another (append only)
+def transfer_book(isbn, trans_from_file, trans_to_file):
+
+    # Load the source CSV into a pandas DataFrame with string dtype to avoid numeric coercion
+    data = pandas.read_csv(trans_from_file, dtype= str)
+
+    # Select the row(s) where isbn column equals the requested isbn and take the first match
+    book = data [data['isbn'] == isbn].iloc[0]
+
+    # Defensive: if the selection produced an empty series, inform user and return
+    if book.empty:
+
+        print(f"ISBN not found")
+
+        return
+
+    else:
+        # Extract the values from the selected row
+        exist_isbn = book["isbn"]
+        author = book['author']
+        title = book['book_title']
+
+        # Open destination CSV in append mode and write the row
+        with open( trans_to_file, 'a', newline= "") as f:
+
+            writer(f).writerow( [exist_isbn, author, title])
+
+# Remove rows that match an ISBN from a CSV file by rewriting the file without that row
+def remove_book(isbn, filename):
+
+    # Read the CSV into a DataFrame with all columns as strings
+    data_file = pandas.read_csv(filename, dtype= str)
+
+    # Keep only rows where isbn does not match the provided isbn (effectively deleting the match)
+    newdata_fram = data_file[data_file['isbn'] != isbn]
+
+    # Write the updated DataFrame back to the same CSV file without the index column
+    newdata_fram.to_csv(filename, index=False)
+
+# Display the contents of a CSV in a readable pandas table; wait for Enter to return
+def display(file):
+
+    # If the CSV has zero rows, inform the user
+    if len(pandas.read_csv(file)) == 0:
+
+        print("\nContent is emtpty!\n\n")
+    else:
+        # Read the CSV into a DataFrame; dtype=str avoids type surprises
+        data = pandas.read_csv(file, dtype= str)
+
+        # Replace default index with a 1-based index for easier reading by beginners
+        data.index = pandas.RangeIndex(start=1, stop=len(data) + 1, step=1)
+        
+        print(data)
+
+        input("\n\n### Press Enter to continue.......\n\n")
+
+
+# Add a new book into library.csv after validating ISBN, title and author
 def add_book():
-    """
-    Prompt the user to add a new book to the library.
 
-    -Validates ISBN (digits only) and simple alphabetic checks for title and author.
-
-    -On success, inserts an entry into the `library` dictionary with ISBN as key and
-    a small info dict as value.
-    """
-
-    # Using to control valid info when want to insert bood
-    check_varible = True
-    
+    # Prompt user for ISBN value as text
     isbn = input('\nEnter ISBN:  ')
 
-    # ISBN must be numeric
+    # ISBN must be digits only; otherwise inform user and return early
     if not isbn.isdigit():
      
-     print(f'\nISBN ({isbn}) some field are not digits!\n') 
+        print(f'\nISBN ({isbn}) some field are not digits!\n') 
+     
+    # Check library for ISBN collision
+    elif is_isbn_exist(new_isbn= isbn, filename= library):
 
-    # ISBN must not already exist in either collection
-    elif isbn in library:
+        
+        print(f"\nISBN: [ {isbn} ] is already exist!\n\n")
 
-        print(f"\nISBN ({isbn}) is already in library!\n")
+    # Check checked-out file for ISBN collision
+    elif is_isbn_exist(new_isbn= isbn, filename= checked_out_books):
 
-    elif isbn in checkedout_books:
-
-        print(f"\nISBN [ {isbn} ] is already checkedout\n\n")
+        print(f"\nISBN: [ {isbn} ] is already checked out1\n\n")
 
     else: 
-    # Title validation: minimal length and alphabetic characters / spaces only
-        title_of_book = input('\nEnter title of book:  ').title()
 
-        if len(title_of_book) < 2:
+        # Prompt for book title and transform to title case for consistent display
+        title = input('\nEnter title of book:  ').title()
+
+        # Ensure title length is reasonable
+        if len(title) < 2:
 
             print(f"\nMaybe forgot entry?\n\n")
+
             return
 
-        for letter in title_of_book:
+        # Validate each character in the title: allow letters, spaces and apostrophes
+        for letter in title:
             
-            if letter.isalpha() or letter == ' ':
+            if letter.isalpha() or letter == ' ' or letter == "'":
+
                 continue
 
             else:
 
-                print(f"\nTitle input ({letter}) is not lapha letter: ")
+                print(f"\nTitle input ({letter}) is not character: ")
 
-                check_varible = False
-                break
-
-        # It must the took info is valid
-        if check_varible:
-
-            # Author validation: minimal length and alphabetic characters / spaces only
-            author = input('\nEnter a name of author:  ').capitalize()
-
-            if len(author) < 2:
-
-                print(f"\nMaybe forgot entry?\n\n")
                 return
-            
-            for letter in author:
-
-                if letter.isalpha() or letter == ' ':
-                    continue
-
-                else:
-                    print(f'\nAuthor entry ({letter}) is not alpah letter:  ')
-
-                    check_varible = False
-                    break
-        
-            # It must the took info is valid to insert book
-            if check_varible:
-
-                # All checks passed: add to library. Use lists so future metadata can be appended.
-                library[isbn] = {
-                    'author':[author],
-                    'title':[title_of_book],
-                }
-                
-                print('\nAdded was successfully!\n\n')
-
-            else:
-                print('\nAdded was not successfully!\n\n')
-
-
-def check_out():
-    """
-    Move a book from `library` to `checkedout_books` by ISBN.
-
-    Validates input and prints the moved entry.
-    """
-
-    if not library:
-
-        print('There are no books to borrow\n\n')
-        return
-
-
-    isbn_num = input('Etner ISBN number:  ')
-
-
-    if not isbn_num.isdigit(): 
-
-        print(f'\nTry again, your entry ({isbn_num}) is not digit\n\n')
-        return
 
     
-    if isbn_num not in library:
+        # Prompt for author name and capitalize first character for stable formatting
+        author = input('\nEnter a name of author:  ').capitalize()
 
-        print(f"\nThis ISBN ({isbn_num}) is not definde or already checked out\n\n")
+        # Minimal length check for author
+        if len(author) < 2:
+
+            print(f"\nMaybe forgot enter a name?\n\n")
+
+            return
+        
+        # Validate author characters similarly to title
+        for letter in author:
+
+            if letter.isalpha() or letter == ' ' or letter == "'":
+                continue
+
+            else:
+                print(f'\nName entry [ {letter} ] is not character!\n\n ')
+
+                return
+
+        # All validations passed: append new row to library CSV
+        store_data(new_isbn= isbn, author_name= author, book_title= title)
+
+# Check out a book: move it from library.csv to checked-out.csv after validations
+def check_out():
+
+    # If library is empty, nothing to check out
+    if len(pandas.read_csv(library)) == 0:
+
+        print('There are no books to borrow\n\n')
+
         return
 
+    # Prompt for ISBN to check out
+    isbn = input('Etner ISBN:  ')
+
+    # Validate ISBN digits
+    if not isbn.isdigit(): 
+
+        print(f'\nTry again, your entry [ {isbn} ] is not isbn digits\n\n')
+
+        return
+
+    # If ISBN is not present in library, show available books and return
+    if not is_isbn_exist(new_isbn= isbn, filename= library):
+
+        print(f"\nThis ISBN ({isbn}) is not definde or already checked out\n\n")
+
+        print(f"Available books:\n____________\n")
+
+        display(file= library)
+
+        return
+
+    # If ISBN exists in library and not already in checked-out file, transfer it
+    if not is_isbn_exist(new_isbn= isbn, filename= checked_out_books):
+
+        # Transfer the entry to checkedout_books
+        transfer_book(isbn= isbn, trans_from_file= library, trans_to_file= checked_out_books)
+
+        print(f'\nISBN: [ {isbn} ] Checkedout successful!\n\n') 
+
+        # Remove the transferred row from library.csv so it's no longer available
+        remove_book(isbn= isbn, filename= library)
+        
     else:
-        # HOW TO ADD ISBN IN OUT_CHECK_DIC WITH ALL OF DATA? (***Done***)
+        # If already checked out, inform the user
+        print(f"\nISBN: [ {isbn} ] is laready checked out!\n\n")
 
-        if isbn_num not in checkedout_books:
-
-            # Transfer the entry to checkedout_books and remove from library
-            checkedout_books[isbn_num] = library[isbn_num]
-
-
-            print('\n\nISBN: ',isbn_num,library[isbn_num],'\n\nCheckedout successful!\n\n') 
-
-            del library[isbn_num]
-
-
+# Check in a book: move it back from checked-out.csv to library.csv after validations
 def check_in():
-    """
-    Return a book from `checkedout_books` back into `library` by ISBN.
 
-    Validates input and prevents duplicate ISBNs in library.
-    """
-
-    if not checkedout_books:
+    # If checked-out file is empty, nothing to check in
+    if len(pandas.read_csv(checked_out_books)) == 0:
 
         print('\nNo books checked out of library\n\n')
 
     else:
+        # Prompt for ISBN to check in
+        isbn = input('\nEnter ISBN:  ')
 
-        isbn_num = input('\nEnter ISBN number:  ')
+        # Validate digits
+        if not isbn.isdigit():
 
-        if not isbn_num.isdigit():
+            print(f'\nYour input ({isbn}) is not digit!\n\n')
 
-            print(f'\nYour input ({isbn_num}) is not digit!\n\n')
+            return
+        # Prevent duplicates: if ISBN already exists in library, do not move it
+        if is_isbn_exist(new_isbn= isbn, filename= library):
+
+            print(f"\nISBN [ {isbn} ] is already exist in library!\n\n")
+
+            return
+            
+        # If ISBN not in checked-out collection, show borrowed books and return
+        if not is_isbn_exist(new_isbn= isbn, filename= checked_out_books):
+
+            print(f'\nISBN ({isbn}) did not check out or not definde\n\n')
+
+            print(f"Borrowed books to check in:\n__________\n")
+
+            display(file= checked_out_books)
+
             return
 
-        if isbn_num in library:
+        # Transfer the row from checked-out back to library and then remove from checked-out
+        transfer_book(isbn= isbn, trans_from_file= checked_out_books, trans_to_file= library)
 
-            print(f"\nISBN [ {isbn_num} ] is exist in library!\n\n")
-            return
-            
-        if not isbn_num in checkedout_books:
+        remove_book(isbn= isbn, filename= checked_out_books)
 
-            print(f'\nISBN ({isbn_num}) did not check out or not definde\n\n')
-            return
+        print(f'\nISBN [ {isbn} ] checked in is successfully\n\n')
 
-
-        if isbn_num not in library:
-
-            # Move back to library and delete isbn from checkout_books
-            library[isbn_num] = checkedout_books[isbn_num]
-
-            print(f'\nISBN ({isbn_num}) checked in is successfully\n\n')
-                
-            del checkedout_books[isbn_num]
+# Delete data permanently
+def del_data(file_path):
 
 
-def dispaly(dict):
-    """
-    Nicely print the contents of the provided collection (dictionary).
+        data_file = pandas.read_csv(file_path, nrows=0) 
+        
+        # Create an empty DataFrame using the columns (header) from the original file.
+        df_empty = pandas.DataFrame(columns=data_file.columns)
+        
+        # Write the empty DataFrame back to the original file path.
+        # index=False ensures the row index is not written.
+        df_empty.to_csv(file_path, index=False)
+        
+        print(f"Successfully emptied data from: {file_path}")
 
-    Expects a mapping from ISBN -> info-dict and prints each ISBN with its info.
-    """
-
-    for isbn in dict:
-
-        print(f"ISBN: {isbn}\n")
-        # info is expected to be a dict like {'author':[...], 'title':[...]}
-        for info in dict[isbn]:
-            
-            print(" " * 5, f"{info}: {dict[isbn][info]}\n")
-            
-        print("_" * 20, "\n")
-            
-
-def show_choices():
+# Print the CLI menu options for the user
+def show_menu_choices():
     """
     Print the menu of available actions."""
 
@@ -233,80 +329,90 @@ def show_choices():
         4. Show available books
         5. Show borrowed books
         6. Dlete all data
-        7. EXIT ‼️
-''')
+        7. EXIT ‼️''')
 
-# Main CLI loop
-while True:
+# Main program entrypoint to ensure files exist and run the menu loop
+def main():
 
-    clear_terminal()
+    # Create files with header row if they are missing
+    generate_file(file_name= library)
 
-    show_choices()
-    
-    choice_option = input('\nEnter your chioce:  ')
+    generate_file(file_name= checked_out_books)
 
-    if not choice_option.isdigit():
-
-        print(f'\nEnter a digit from [ 1 to 7 ] please not [ {choice_option} ]\n\n')
-
-    else:
+    # Start the interactive CLI loop
+    while True:
 
         clear_terminal()
 
-        int_option = int(choice_option)
+        show_menu_choices()
+        
+        # Prompt user for a numeric choice
+        choice_option = input('\nEnter your chioce:  ')
 
-        if int_option == 1: # Add book
+        # Validate that the choice is a single digit string
+        if not choice_option.isdigit() or len ( choice_option ) > 1:
 
-            add_book()
+            print(f'\nEnter a digit from [ 1 to 7 ] please, not [ {choice_option} ]\n\n')
 
-        elif int_option == 2: # Check out
+        else:
+            clear_terminal()
 
-            check_out()
+            # Convert the validated choice to an integer
+            int_option = int(choice_option) 
 
-        elif int_option == 3: # Check in
+            # Map choices to functions
+            if int_option == 1: # Add book
 
-           check_in()
+                add_book()
 
-        elif int_option == 4: # Display availabel books
+            elif int_option == 2: # Check out
 
-            if not library:
-                print('\nLibrary is empty there is nothing to show!\n\n') 
+                check_out()
 
-            else:
-                print('\n---Available Books---\n')
+            elif int_option == 3: # Check in
 
-                dispaly(dict= library)
+                check_in()
 
-        elif int_option == 5: # Display borrow books
+            elif int_option == 4: # Display availabel books
 
-            if not checkedout_books:
+                display(file= library)
 
-                print(f'\nNothing checkedout! [ {checkedout_books} ]\n\n')
+            elif int_option == 5: # Display borrow books
 
-            else:
-                print('\n\n---Checkedout books---\n\n')
+                display(file= checked_out_books)
+
+            elif int_option == 6: # Delete data
+
+                # Only attempt deletion if either file contains rows
+                if len(pandas.read_csv(library)) == 0 and len(pandas.read_csv(checked_out_books)) == 0:
+
+                    print(f'\nContent is already empty\n\n')
+
+                else:
+
+                    # Delet content
+                    del_data(file_path= library)
+                    del_data(file_path= checked_out_books)
+                    input("\n\nPress enter to continue.....  ")
 
 
-                dispaly(dict= checkedout_books)
+            elif int_option == 7: # Stop running
 
+                print("\nSee you later!\n\n")
 
-        elif int_option == 6: # Delete data
+                break
 
-            if not library:
+            else: # Invalid entry
 
-                print(f'\nLibrary is already empty: [ {library} ]\n\n')
+                print(f"Please enter a digit from [ 1 to 7 ] not [ {choice_option} ]\n\n")
 
-            else:
-                library = {}
-                print(f'\nDeletion was successfully: [ {library} ]\n\n')
+        # Pause briefly so the user can read the result before the menu reappears
+        sleep(3)
 
-        elif int_option == 7: # Stop running
+# Run the program when the module is executed directly
+main()
 
-            print("\nSee you later!\n\n")
-            break
+# Resolved use cases (Done***):
 
-        else: # Invalid entry
-
-            print(f"Please enter a digit from [ 1 to 7 ] not [ {choice_option} ]\n\n")
-    # Pause briefly so the user can read the result before the menu reappears
-    sleep(3)
+# - Remove a book from library when it is borrowed (transfer + delete) [Done *****]
+# - Add ISBN and all book metadata to checked-out file when checking out [Done ***]
